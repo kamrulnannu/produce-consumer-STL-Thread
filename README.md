@@ -26,18 +26,19 @@ IMPLEMENTATION:
    implemenation of WorkItem are not known to thread.
 
    STL thread are used to implement the above project. Two approach are
-   used:
-   (a) Joinable Thread Pool: Threads run in infinite loop and waiting on
-       data to be available in Queue. These data are enqueued by main (or another thread from
-       the thread pool) thread. main thread will wait after enqueing data. When all data
-       in queue are processed, thread notify main thread that queue is empty. Then
-       main will notify thread pool to terminate via atomic boolean
-       variable and wait for them to join with main thread (TerminateThreadPool()). Then
-       the server will exit gracefully.
-    (b) Detachable Thread Pool: This approach is same as (a) except that
-        main thread does not call TerminateThreadPool(). When queue is
-        empty, thread pool notify main which then exits and eventually
-        thread pool also exit.
+   used:  
+   (a) Joinable Thread Pool: Threads run in infinite loop and waiting on  
+       data to be available in Queue. These data are enqueued by main (or another thread from  
+       the thread pool) thread. main thread will wait after enqueing data. When all data  
+       in queue are processed, thread notify main thread that queue is empty. Then  
+       main will notify thread pool to terminate via atomic boolean  
+       variable and wait for them to join with main thread (TerminateThreadPool()). Then  
+       the server will exit gracefully.  
+         
+    (b) Detachable Thread Pool: This approach is same as (a) except that  
+        main thread does not call TerminateThreadPool(). When queue is  
+        empty, thread pool notify main which then exits and eventually  
+        thread pool also exit.  
 
 
 BUILD:
