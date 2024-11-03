@@ -42,10 +42,10 @@ IMPLEMENTATION:
 
 
 BUILD:
-$ g++ -v
-Using built-in specs.
-COLLECT_GCC=g++
-COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-pc-cygwin/12/lto-wrapper.exe
-Target: x86_64-pc-cygwin
-...
-gcc version 12.4.0 (GCC)
+$ g++ -v  
+Using built-in specs.  
+COLLECT_GCC=g++  
+COLLECT_LTO_WRAPPER=/usr/lib/gcc/x86_64-pc-cygwin/12/lto-wrapper.exe  
+Target: x86_64-pc-cygwin  
+...  
+gcc version 12.4.0 (GCC)  
