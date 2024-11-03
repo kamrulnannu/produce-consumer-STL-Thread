@@ -34,7 +34,6 @@ IMPLEMENTATION:
        main will notify thread pool to terminate via atomic boolean
        variable and wait for them to join with main thread (TerminateThreadPool()). Then
        the server will exit gracefully.
-
     (b) Detachable Thread Pool: This approach is same as (a) except that
         main thread does not call TerminateThreadPool(). When queue is
         empty, thread pool notify main which then exits and eventually
