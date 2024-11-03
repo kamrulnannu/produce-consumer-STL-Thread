@@ -27,6 +27,7 @@ IMPLEMENTATION:
 
    STL thread are used to implement the above project. Two approach are
    used:  
+       
    (a) Joinable Thread Pool: Threads run in infinite loop and waiting on  
        data to be available in Queue. These data are enqueued by main (or another thread from  
        the thread pool) thread. main thread will wait after enqueing data. When all data  
