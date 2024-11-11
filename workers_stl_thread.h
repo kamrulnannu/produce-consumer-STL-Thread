@@ -20,9 +20,15 @@ class Workers
         std::atomic<bool> m_Running;
         vector<std::thread> m_Threads;
         //vector<std::thread *> m_Threads;
-        mutable std::mutex m_Mutex;
-        std::condition_variable m_WorkCondVar;
-        std::condition_variable m_WaitCondVar;
+        //mutable std::mutex m_Mutex;
+        mutable std::recursive_mutex m_Mutex;
+        //std::condition_variable m_WorkCondVar; condition_variable works
+        //with std::mutex only. It does not work other mutex like shared_mutex, recursive_mutex
+        //timed_mutex etc. condition_variable_any supports all kinds of
+        //mutex.
+        std::condition_variable_any m_WorkCondVar;
+        //std::condition_variable m_WaitCondVar;
+        std::condition_variable_any m_WaitCondVar;
         queue<WorkItem *> m_WorkItems;
 
         void ThreadStart();
@@ -45,7 +51,8 @@ class Workers
 
         int GetNumJobs() const
         {
-            std::lock_guard<std::mutex> lkg(m_Mutex);
+            //std::lock_guard<std::mutex> lkg(m_Mutex);
+            std::lock_guard<std::recursive_mutex> lkg(m_Mutex);
             return m_WorkItems.size();
         }
 
@@ -56,6 +63,15 @@ class Workers
         void Wait();
 
         void TerminateThreadPool();
+
+        static string getThreadId()
+        {
+            std::thread::id threadId = std::this_thread::get_id();
+
+            std::ostringstream oss;
+            oss << threadId;
+            return oss.str();
+        }
 };
 
 extern "C"

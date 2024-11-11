@@ -38,7 +38,7 @@ void Workers::SpawnThread()
          * uses move-assignment.
          */
         //m_Threads[i] = std::thread(&Workers::ThreadStart, this); OK (5)
-        
+
         /*
          * Detaches the new thread from current (i.e. calling) thread and allowing both
          * to execute independently from each other. Both threads continue without
@@ -52,7 +52,7 @@ void Workers::SpawnThread()
          * thread), we don't have to call TerminateThreadPool(), because
          * detached threads are not join-able. Detached thread will terminate gracefully
          * when main() returns or exits.
-         * 
+         *
          * If main() exits/returns while detached threads are in the middle of execution,
          * incorrect results will be produced. To correct this situation, synchronization is
          * necessary between detached threads and main thread via mutex and condition_variable.
@@ -82,11 +82,13 @@ Workers::~Workers()
 
 void Workers::EnqueueWorkItem(WorkItem *item)
 {
-    std::lock_guard<std::mutex> lg(m_Mutex);
+    //std::lock_guard<std::mutex> lg(m_Mutex);
+    std::lock_guard<std::recursive_mutex> lg(m_Mutex);
 
     m_WorkItems.push(item);
 
-    m_WorkCondVar.notify_all();   // Wake up all threads, OK
+    m_WorkCondVar.notify_one();  // Wake up one thread, efficient
+    //m_WorkCondVar.notify_all();   // Wake up all threads, expensive
 }
 
 void * thread_start_func_cpp(void *arg)
@@ -100,7 +102,8 @@ void * thread_start_func_cpp(void *arg)
     Workers * threads = (Workers *)arg;
     Workers &threadRef = *threads;
 
-    std::unique_lock<std::mutex> ulk(threadRef.m_Mutex, std::defer_lock);
+    //std::unique_lock<std::mutex> ulk(threadRef.m_Mutex, std::defer_lock);
+    std::unique_lock<std::recursive_mutex> ulk(threadRef.m_Mutex, std::defer_lock);
 
     while (threadRef.m_Running)
     {
@@ -110,12 +113,12 @@ void * thread_start_func_cpp(void *arg)
             /*
              * The following call will release m_Mutex atomically and (Execution Susupended and)
              * wait for notify_one() or notify_all() by producer thread via (1) EnqueueWorkItem() when
-             * an item is pushed into work-Q or (2) TerminateThreadPool() when no more data will be 
+             * an item is pushed into work-Q or (2) TerminateThreadPool() when no more data will be
              * available (and server is about to exit) and this method will set m_Running
              * flag to false so that threads exit gracefully.
              */
             threadRef.m_WorkCondVar.wait(ulk);
-            
+
             /*
              * Waiting consumer thread waked-up by producer thread via
              * EqueueWorkItem() or TerminateThreadPool(), as data is in Q to process or
@@ -136,10 +139,6 @@ void * thread_start_func_cpp(void *arg)
          * that server is about to exit..
          */
 
-        /*
-         * NOTE: If we detach threads (line # (6) in SpawnThread()), remove line
-         * (7), (8), (9) and add line (10).
-         */
         if (!threadRef.m_WorkItems.empty())
         {
             /*
@@ -147,7 +146,7 @@ void * thread_start_func_cpp(void *arg)
              */
             WorkItem * item = threadRef.m_WorkItems.front();
             threadRef.m_WorkItems.pop();
-            
+
             ulk.unlock();   // (7)
 
             if (item)
@@ -170,7 +169,8 @@ void * thread_start_func_cpp(void *arg)
          * If Q is empty, it will broadcast a signal to return to caller of
          * Wait().
          */
-        std::lock_guard<std::mutex> lkg(threadRef.m_Mutex);  // (9)
+        //std::lock_guard<std::mutex> lkg(threadRef.m_Mutex);  // (9)
+        std::lock_guard<std::recursive_mutex> lkg(threadRef.m_Mutex);  // (9)
         if (threadRef.m_WorkItems.empty())
         {
             // Broadcast to wake-up from Workers::Wait()
@@ -186,7 +186,8 @@ void * thread_start_func_cpp(void *arg)
 
 void Workers::ThreadStart()
 {
-    std::unique_lock<std::mutex> ulk(m_Mutex, std::defer_lock);
+    //std::unique_lock<std::mutex> ulk(m_Mutex, std::defer_lock);
+    std::unique_lock<std::recursive_mutex> ulk(m_Mutex, std::defer_lock);
 
     while (m_Running)
     {
@@ -197,7 +198,7 @@ void Workers::ThreadStart()
             /*
              * The following call will release m_Mutex atomically and (Execution Susupended and)
              * wait for notify_one() or notify_all() by producer thread via (1) EnqueueWorkItem() when
-             * an item is pushed into work-Q or (2) TerminateThreadPool() when no more data will be 
+             * an item is pushed into work-Q or (2) TerminateThreadPool() when no more data will be
              * available (and server is about to exit) and this method will set m_Running
              * flag to false so that threads exit gracefully.
              */
@@ -222,10 +223,6 @@ void Workers::ThreadStart()
          * notify_one() or notify_all() upon enqueuing data or signalling
          * that server is about to exit..
          */
-        /*
-         * NOTE: If we detach threads (line # (6) in SpawnThread()), remove line
-         * (7), (8), (9) and add line (10).
-         */
         if (!m_WorkItems.empty())
         {
             /*
@@ -234,11 +231,21 @@ void Workers::ThreadStart()
             WorkItem * item = m_WorkItems.front();
             m_WorkItems.pop();
 
-            ulk.unlock();  // (7)
+            /*
+             * Why do we need to unlock here?
+             * 
+             * Some item->process() (Line# 7a) may need to enqueue data which requires
+             * to get lock. Without line (7), there will be dead-lock when
+             * try to enqueue via process().
+             *
+             * But if we use std::recursive_mutex instead of std::mutex, we
+             * don't need line (7), (8), (9), but we need line (10).
+             */
+            //ulk.unlock();  // (7)
 
             if (item)
             {
-                item->process();
+                item->process(); //(7a)
                 delete item;
             }
         }
@@ -247,7 +254,7 @@ void Workers::ThreadStart()
             /*
              * A thread is waked up by TerminateThreadPool()
              */
-            ulk.unlock();   // (8)
+            //ulk.unlock();   // (8)
         }
 
         /*
@@ -255,13 +262,14 @@ void Workers::ThreadStart()
          * If Q is empty, it will broadcast a signal to return to caller of
          * Wait().
          */
-        std::lock_guard<std::mutex> lkg(m_Mutex);  // (9)
+        //std::lock_guard<std::mutex> lkg(m_Mutex);  // (9)
+        //std::lock_guard<std::recursive_mutex> lkg(m_Mutex);  // (9)
         if (std::empty(m_WorkItems))
         {
             m_WaitCondVar.notify_one();
         }
 
-        // ulk.unlock();  // (10)
+        ulk.unlock();  // (10)
     } // while(m_Running)
 }
 
@@ -270,7 +278,8 @@ void Workers::Wait()
     /*
      * Wait until all work items in Q consumed
      */
-    std::unique_lock<std::mutex> ulk(m_Mutex);
+    //std::unique_lock<std::mutex> ulk(m_Mutex);
+    std::unique_lock<std::recursive_mutex> ulk(m_Mutex);
 
     /*
      * Here means, we got lock
@@ -284,7 +293,7 @@ void Workers::Wait()
          * when the Q becomes empty.
          */
          m_WaitCondVar.wait(ulk);
-        
+
         /*
          * Here means, broadasted/signaled by a consumer thread from ThreadStart()
          * because all items in Q are processed.

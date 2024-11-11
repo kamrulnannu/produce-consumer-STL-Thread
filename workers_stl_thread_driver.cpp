@@ -9,18 +9,14 @@ int main()
 
     threadPool.SpawnThread();
 
-    for (int i = 0; i < 10000; ++i)
+    for (int i = 0; i < 100; ++i)
     {
-        WorkItem * I = new Integer(33+i);
-
-        WorkItem * d = new Double(11.11 + i);
+        threadPool.EnqueueWorkItem(new Integer(33+i));
 
         string str = "Hello World: " + to_string(i);
-        WorkItem * s = new String(str);
+        threadPool.EnqueueWorkItem(new String(str));
 
-        threadPool.EnqueueWorkItem(I);
-        threadPool.EnqueueWorkItem(d);
-        threadPool.EnqueueWorkItem(s);
+        threadPool.EnqueueWorkItem(new Double(11.11 + i));
     }
 
     /* Wait for all data to be processed in the Queue */
